@@ -1,0 +1,35 @@
+.content {
+  max-width: 95vw;
+}
+
+.markdown h1,
+.markdown h2,
+.markdown h3 {
+  margin-top: var(--mantine-spacing-md);
+  margin-bottom: var(--mantine-spacing-xs);
+}
+
+.markdown p,
+.markdown ul,
+.markdown ol {
+  margin-bottom: var(--mantine-spacing-sm);
+}
+
+.markdown ul,
+.markdown ol {
+  padding-left: var(--mantine-spacing-lg);
+}
+
+.markdown code {
+  background: var(--mantine-color-gray-1);
+  padding: 2px 4px;
+  border-radius: var(--mantine-radius-sm);
+}
+
+.markdown pre {
+  background: var(--mantine-color-gray-1);
+  padding: var(--mantine-spacing-sm);
+  border-radius: var(--mantine-radius-sm);
+  overflow-x: auto;
+  white-space: pre-wrap;
+}

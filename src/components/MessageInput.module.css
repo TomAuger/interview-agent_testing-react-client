@@ -1,0 +1,14 @@
+.row {
+  display: flex;
+  gap: var(--mantine-spacing-sm);
+  align-items: flex-end;
+}
+
+.input {
+  flex: 1;
+}
+
+.loader {
+  flex: none;
+  margin-bottom: var(--mantine-spacing-sm);
+}

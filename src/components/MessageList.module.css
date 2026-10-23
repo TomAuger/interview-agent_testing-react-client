@@ -1,0 +1,40 @@
+.list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--mantine-spacing-sm);
+  padding: var(--mantine-spacing-md) 0;
+}
+
+.message {
+  max-width: 80%;
+  padding: var(--mantine-spacing-xs) var(--mantine-spacing-md);
+  border-radius: var(--mantine-radius-lg);
+  white-space: pre-wrap;
+  overflow-wrap: break-word;
+  line-height: var(--mantine-line-height);
+}
+
+.bot {
+  composes: message;
+  align-self: flex-start;
+  background: var(--mantine-color-gray-1);
+}
+
+.human {
+  composes: message;
+  align-self: flex-end;
+  background: var(--mantine-color-blue-filled);
+  color: var(--mantine-color-white);
+}
+
+.error {
+  align-self: stretch;
+}
+
+.completion {
+  align-self: stretch;
+  padding: var(--mantine-spacing-md);
+  border-radius: var(--mantine-radius-md);
+  background: var(--mantine-color-green-0);
+  border: 1px solid var(--mantine-color-green-3);
+}

@@ -1,0 +1,45 @@
+.layout {
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+  max-width: 760px;
+  margin: 0 auto;
+  padding: var(--mantine-spacing-md);
+}
+
+.topbar {
+  flex: none;
+}
+
+.interviewId {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 70%;
+}
+
+.errorAlert {
+  flex: none;
+  margin-top: var(--mantine-spacing-sm);
+}
+
+.scroll {
+  flex: 1;
+  overflow-y: auto;
+  min-height: 0;
+}
+
+.footer {
+  flex: none;
+  padding-top: var(--mantine-spacing-sm);
+}
+
+.artifactArea {
+  display: flex;
+  flex-direction: column;
+  gap: var(--mantine-spacing-xs);
+}
+
+.artifactStatus {
+  margin-top: var(--mantine-spacing-xs);
+}
