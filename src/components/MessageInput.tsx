@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import type { KeyboardEvent } from 'react';
 import { Button, Loader, Textarea } from '@mantine/core';
 import styles from './MessageInput.module.css';
@@ -10,7 +10,14 @@ interface MessageInputProps {
 
 export function MessageInput({ isLoading, onSubmit }: MessageInputProps) {
   const [value, setValue] = useState('');
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
   const canSubmit = value.trim().length > 0 && !isLoading;
+
+  useEffect(() => {
+    if (!isLoading) {
+      textareaRef.current?.focus();
+    }
+  }, [isLoading]);
 
   const submit = () => {
     if (!canSubmit) return;
@@ -28,6 +35,7 @@ export function MessageInput({ isLoading, onSubmit }: MessageInputProps) {
   return (
     <div className={styles.row}>
       <Textarea
+        ref={textareaRef}
         className={styles.input}
         autosize
         minRows={3}
@@ -40,7 +48,7 @@ export function MessageInput({ isLoading, onSubmit }: MessageInputProps) {
       />
       {isLoading && <Loader size="sm" className={styles.loader} />}
       <Button onClick={submit} disabled={!canSubmit}>
-        Send
+        Send (⌘+Enter)
       </Button>
     </div>
   );
