@@ -38,3 +38,41 @@
   background: var(--mantine-color-green-0);
   border: 1px solid var(--mantine-color-green-3);
 }
+
+.lineTag {
+  display: inline-block;
+  margin-right: var(--mantine-spacing-xs);
+  padding: 0 var(--mantine-spacing-xs);
+  border-radius: var(--mantine-radius-sm);
+  font-size: var(--mantine-font-size-xs);
+  font-family: var(--mantine-font-family-monospace);
+  opacity: 0.55;
+  cursor: context-menu;
+  user-select: none;
+}
+
+.lineTag:hover {
+  opacity: 1;
+  background: var(--mantine-color-dark-1);
+  color: var(--mantine-color-white);
+}
+
+.menu {
+  position: fixed;
+  z-index: 1000;
+  padding: 2px;
+  min-width: 160px;
+}
+
+.menuItem {
+  display: block;
+  width: 100%;
+  padding: var(--mantine-spacing-xs) var(--mantine-spacing-sm);
+  border-radius: var(--mantine-radius-sm);
+  font-size: var(--mantine-font-size-sm);
+  text-align: left;
+}
+
+.menuItem:hover {
+  background: var(--mantine-color-gray-1);
+}

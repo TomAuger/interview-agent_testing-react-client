@@ -33,19 +33,33 @@ does not allow cross-origin requests.
 
 ## Usage
 
-1. On the start screen, click **Generate new ID** then **Start / Resume** — or paste an
-   existing interview id to resume it.
+1. The left pane lists every stored interview id with its run status — click one
+   to jump back into that conversation, or **+ New interview** to start fresh. On
+   the start screen you can also click **Generate new ID** then **Start / Resume**,
+   or paste an existing interview id.
 2. Answer each question; Enter inserts a newline, **CMD+Enter** (Mac) / **CTRL+Enter**
    (PC) submits.
-3. Type `finish` (or answer until the interview closes) to get the closing message and
+3. Each completed turn is tagged with a `#line` number. **Right-click a line tag**
+   and choose **Roll back to this turn** to erase that turn's answer and everything
+   after it, then re-answer the same question. Works on completed interviews too.
+4. Type `finish` (or answer until the interview closes) to get the closing message and
    gap list, then click **View artifact** to open the generated Markdown brief.
+   **Regenerate artifact** starts a fresh artifact run from the interview's stored
+   ledger — useful after changing the writer agent — and replaces the shown brief
+   when it succeeds.
 
 ## Behaviour notes
 
 - The active interview id is persisted in `localStorage`
-  (`interview-ui/interviewId`), so a refresh resumes the same run. **Start over** clears
-  it.
-- The artifact status is fetched only when you click **View artifact** — there is no
-  polling. If it is still generating, click again after a few seconds.
-- `stale-prompt` and `model-error` responses show as inline errors; the interview does
-  not advance, so you can retry the same answer.
+  (`interview-ui/interviewId`); on reload the full conversation is rebuilt from
+  `GET /interviews/:id` and scrolled to the last turn. **Start over** clears it.
+- Rollback uses `resume-async` (`{rollbackToTurn: n}`) on suspended runs and
+  `time-travel-async` (to the `conduct` step) on completed ones. An out-of-range
+  target shows `rollback-error` (`INTERVIEW_003`) without touching state.
+- **View artifact** resolves the newest artifact run for the interview (the
+  original or the latest `<id>-aN` attempt); **Regenerate** polls the new run
+  until it settles. Earlier artifacts stay readable on the server by run id.
+- `stale-prompt`, `model-error` and `rollback-error` responses show as inline
+  errors; the interview does not advance, so you can retry.
+- The test-harness routes mount outside `/api` (`/interviews/...`); the dev server
+  proxies both prefixes to `agent-server`.

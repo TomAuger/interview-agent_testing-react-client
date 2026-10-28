@@ -1,0 +1,12 @@
+.appShell {
+  display: flex;
+  height: 100vh;
+}
+
+.mainPane {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}

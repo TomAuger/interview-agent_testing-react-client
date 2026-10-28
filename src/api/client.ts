@@ -22,7 +22,7 @@ export class HttpError extends Error {
   }
 }
 
-export type SuspendKind = 'welcome' | 'question' | 'stale-prompt' | 'model-error';
+export type SuspendKind = 'welcome' | 'question' | 'stale-prompt' | 'model-error' | 'rollback-error';
 
 export interface SuspendPayload {
   kind: SuspendKind;
@@ -49,6 +49,49 @@ export interface WorkflowRun {
 export interface ArtifactRun {
   status: string;
   markdown?: string;
+  /** The artifact run id the status was read from (the interview id or a `<id>-aN` attempt). */
+  runId?: string;
+}
+
+/** One line-tagged entry in the transcript returned by GET /interviews/:id. */
+export type TranscriptMessage =
+  | { kind: 'welcome'; text: string }
+  | {
+      kind: 'question';
+      line: number;
+      promptId: string;
+      questionId: string | null;
+      text: string;
+    }
+  | {
+      kind: 'answer';
+      line: number;
+      turnId: string;
+      text: string;
+      directive: 'answer' | 'skip' | 'finish';
+      at: number;
+    };
+
+/** Response shape of the test-harness transcript route (mounted outside /api). */
+export interface InterviewTranscript {
+  interviewId: string;
+  status: string;
+  messages: TranscriptMessage[];
+  pending: { promptId: string; questionId: string | null; askedText: string } | null;
+  completion: {
+    reason: string;
+    definitionOfDoneMet: boolean;
+    gaps: string[];
+    closing: string;
+  } | null;
+}
+
+/** One entry in the built-in workflow runs list — the interview id ledger. */
+export interface InterviewRunSummary {
+  runId: string;
+  status: string;
+  createdAt: string;
+  updatedAt: string;
 }
 
 const isRecord = (value: unknown): value is Record<string, unknown> =>
@@ -58,7 +101,8 @@ const isSuspendKind = (value: unknown): value is SuspendKind =>
   value === 'welcome' ||
   value === 'question' ||
   value === 'stale-prompt' ||
-  value === 'model-error';
+  value === 'model-error' ||
+  value === 'rollback-error';
 
 const isCompletionReason = (value: unknown): value is InterviewResult['completionReason'] =>
   value === 'questions-exhausted' || value === 'finish-requested' || value === 'turn-cap';
@@ -169,3 +213,146 @@ export const getArtifactStatus = async (interviewId: string): Promise<ArtifactRu
       `/api/workflows/${ARTIFACT_WORKFLOW_ID}/runs/${encodeURIComponent(interviewId)}?fields=result`,
     ),
   );
+
+const parseTranscriptMessage = (raw: unknown): TranscriptMessage | undefined => {
+  if (!isRecord(raw)) return undefined;
+  if (raw.kind === 'welcome' && typeof raw.text === 'string') {
+    return { kind: 'welcome', text: raw.text };
+  }
+  if (
+    raw.kind === 'question' &&
+    typeof raw.line === 'number' &&
+    typeof raw.promptId === 'string' &&
+    typeof raw.text === 'string'
+  ) {
+    return {
+      kind: 'question',
+      line: raw.line,
+      promptId: raw.promptId,
+      questionId: typeof raw.questionId === 'string' ? raw.questionId : null,
+      text: raw.text,
+    };
+  }
+  if (
+    raw.kind === 'answer' &&
+    typeof raw.line === 'number' &&
+    typeof raw.turnId === 'string' &&
+    typeof raw.text === 'string' &&
+    typeof raw.at === 'number'
+  ) {
+    const directive =
+      raw.directive === 'skip' || raw.directive === 'finish' ? raw.directive : 'answer';
+    return { kind: 'answer', line: raw.line, turnId: raw.turnId, text: raw.text, directive, at: raw.at };
+  }
+  return undefined;
+};
+
+const parseTranscript = (raw: unknown): InterviewTranscript => {
+  if (!isRecord(raw) || typeof raw.interviewId !== 'string' || typeof raw.status !== 'string') {
+    throw new Error('Malformed transcript response');
+  }
+  const messages = Array.isArray(raw.messages)
+    ? raw.messages
+        .map(parseTranscriptMessage)
+        .filter((m): m is TranscriptMessage => m !== undefined)
+    : [];
+  const pending =
+    isRecord(raw.pending) && typeof raw.pending.promptId === 'string'
+      ? {
+          promptId: raw.pending.promptId,
+          questionId: typeof raw.pending.questionId === 'string' ? raw.pending.questionId : null,
+          askedText: typeof raw.pending.askedText === 'string' ? raw.pending.askedText : '',
+        }
+      : null;
+  const completion =
+    isRecord(raw.completion) && typeof raw.completion.closing === 'string'
+      ? {
+          reason: typeof raw.completion.reason === 'string' ? raw.completion.reason : 'unknown',
+          definitionOfDoneMet: raw.completion.definitionOfDoneMet === true,
+          gaps: Array.isArray(raw.completion.gaps)
+            ? raw.completion.gaps.filter((g): g is string => typeof g === 'string')
+            : [],
+          closing: raw.completion.closing,
+        }
+      : null;
+  return { interviewId: raw.interviewId, status: raw.status, messages, pending, completion };
+};
+
+/**
+ * Full persisted transcript for one interview. NOTE: this test-harness route
+ * mounts outside `/api` — `/interviews/:id`, proxied separately by Vite.
+ */
+export const getTranscript = async (interviewId: string): Promise<InterviewTranscript> =>
+  parseTranscript(await request(`/interviews/${encodeURIComponent(interviewId)}`));
+
+const parseInterviewRuns = (raw: unknown): InterviewRunSummary[] => {
+  if (!isRecord(raw) || !Array.isArray(raw.runs)) {
+    throw new Error('Malformed runs list response');
+  }
+  return raw.runs
+    .filter(
+      (r): r is Record<string, unknown> =>
+        isRecord(r) && typeof r.runId === 'string' && typeof r.status === 'string',
+    )
+    .map((r) => ({
+      runId: r.runId as string,
+      status: r.status as string,
+      createdAt: typeof r.createdAt === 'string' ? r.createdAt : '',
+      updatedAt: typeof r.updatedAt === 'string' ? r.updatedAt : '',
+    }));
+};
+
+/** Every stored interview run (built-in route): the ledger of interview ids. */
+export const listInterviews = async (): Promise<InterviewRunSummary[]> =>
+  parseInterviewRuns(
+    await request(`/api/workflows/${INTERVIEW_WORKFLOW_ID}/runs?perPage=100`),
+  );
+
+/**
+ * Roll an interview back to a turn line (erases that turn's answer and all
+ * later state, re-presenting the prompt at the line). Suspended runs use
+ * resume-async; completed runs need time-travel back to the conduct step.
+ */
+export const rollbackInterview = async (
+  interviewId: string,
+  status: string,
+  rollbackToTurn: number,
+): Promise<WorkflowRun> =>
+  parseWorkflowRun(
+    await post(
+      status === 'suspended'
+        ? `/api/workflows/${INTERVIEW_WORKFLOW_ID}/resume-async?runId=${encodeURIComponent(interviewId)}`
+        : `/api/workflows/${INTERVIEW_WORKFLOW_ID}/time-travel-async?runId=${encodeURIComponent(interviewId)}`,
+      status === 'suspended'
+        ? { resumeData: { rollbackToTurn } }
+        : { step: 'conduct', resumeData: { rollbackToTurn } },
+    ),
+  );
+
+/**
+ * Start a fresh artifact run from the interview's stored ledger. Returns the
+ * new run id (`<interviewId>-aN`) to poll via getArtifactStatus.
+ */
+export const regenerateArtifact = async (interviewId: string): Promise<{ runId: string }> => {
+  const raw = await post(`/interviews/${encodeURIComponent(interviewId)}/artifact`, {});
+  if (!isRecord(raw) || typeof raw.runId !== 'string') {
+    throw new Error('Malformed artifact regeneration response');
+  }
+  return { runId: raw.runId };
+};
+
+/**
+ * Status of the most recent artifact attempt for an interview — the original
+ * run (id = interviewId) or the newest `<id>-aN` regeneration.
+ */
+export const getLatestArtifactStatus = async (interviewId: string): Promise<ArtifactRun> => {
+  const raw = await request(`/api/workflows/${ARTIFACT_WORKFLOW_ID}/runs?perPage=100`);
+  const latest = parseInterviewRuns(raw)
+    .filter((r) => r.runId === interviewId || r.runId.startsWith(`${interviewId}-a`))
+    .sort((a, b) => Date.parse(b.createdAt) - Date.parse(a.createdAt))[0]?.runId;
+  if (latest === undefined) {
+    throw new HttpError(404, `/api/workflows/${ARTIFACT_WORKFLOW_ID}/runs`);
+  }
+  const run = await getArtifactStatus(latest);
+  return { ...run, runId: latest };
+};

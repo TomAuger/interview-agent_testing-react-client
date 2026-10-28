@@ -1,0 +1,48 @@
+.pane {
+  display: flex;
+  flex-direction: column;
+  width: 240px;
+  flex: none;
+  border-right: 1px solid var(--mantine-color-gray-3);
+  background: var(--mantine-color-gray-0);
+  padding: var(--mantine-spacing-sm);
+  gap: var(--mantine-spacing-xs);
+  min-height: 0;
+}
+
+.header {
+  flex: none;
+}
+
+.newButton {
+  flex: none;
+}
+
+.list {
+  flex: 1;
+  min-height: 0;
+}
+
+.row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--mantine-spacing-xs);
+  width: 100%;
+  padding: var(--mantine-spacing-xs);
+  border-radius: var(--mantine-radius-sm);
+}
+
+.row:hover {
+  background: var(--mantine-color-gray-2);
+}
+
+.active {
+  background: var(--mantine-color-blue-0);
+}
+
+.runId {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}

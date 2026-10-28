@@ -10,6 +10,11 @@ export default defineConfig({
         target: 'http://localhost:4111',
         changeOrigin: true,
       },
+      // Test-harness routes mount outside the reserved /api prefix.
+      '/interviews': {
+        target: 'http://localhost:4111',
+        changeOrigin: true,
+      },
     },
   },
 });
