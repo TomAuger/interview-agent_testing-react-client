@@ -258,7 +258,7 @@ export default function App() {
    * Start button: join the interview if a run already exists for the typed id
    * (e.g. after Start Over with an existing id), otherwise start a fresh run.
    */
-  const startOrJoin = async (interviewId: string): Promise<void> => {
+  const startOrJoin = async (interviewId: string, profileId?: string): Promise<void> => {
     dispatch({ type: 'JOIN_INTERVIEW', interviewId });
     storeId(interviewId);
     try {
@@ -273,7 +273,7 @@ export default function App() {
         }
       }
       if (!exists) {
-        await startInterview(interviewId);
+        await startInterview(interviewId, profileId);
       }
       await hydrate(interviewId);
       void refreshList();
@@ -343,7 +343,7 @@ export default function App() {
               <StartScreen
                 initialId={state.interviewId ?? ''}
                 isLoading={state.isLoading}
-                onStart={(id) => void startOrJoin(id)}
+                onStart={(id, profileId) => void startOrJoin(id, profileId)}
               />
             </Container>
           )

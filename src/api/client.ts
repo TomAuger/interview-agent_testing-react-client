@@ -180,13 +180,37 @@ const post = (path: string, body: unknown): Promise<unknown> =>
     body: JSON.stringify(body),
   });
 
-export const startInterview = async (interviewId: string): Promise<WorkflowRun> =>
+/**
+ * Start a fresh interview run, optionally choosing the interview type via the
+ * registered profile id (see listProfiles).
+ */
+export const startInterview = async (
+  interviewId: string,
+  profileId?: string,
+): Promise<WorkflowRun> =>
   parseWorkflowRun(
     await post(
       `/api/workflows/${INTERVIEW_WORKFLOW_ID}/start-async?runId=${encodeURIComponent(interviewId)}`,
-      { inputData: {}, initialState: { ledger: null } },
+      {
+        inputData: profileId === undefined ? {} : { profileId },
+        initialState: { ledger: null },
+      },
     ),
   );
+
+/**
+ * Registered interview profile ids a client may pass to startInterview.
+ * Test-harness route mounted outside `/api` — `/interview-profiles`.
+ */
+export const listProfiles = async (): Promise<string[]> => {
+  const raw = await request('/interview-profiles');
+  if (!isRecord(raw) || !Array.isArray(raw.profiles)) {
+    throw new Error('Malformed profile list response');
+  }
+  return raw.profiles
+    .filter((p): p is Record<string, unknown> => isRecord(p) && typeof p.id === 'string')
+    .map((p) => p.id as string);
+};
 
 export const resumeInterview = async (
   interviewId: string,
@@ -289,17 +313,24 @@ const parseInterviewRuns = (raw: unknown): InterviewRunSummary[] => {
   if (!isRecord(raw) || !Array.isArray(raw.runs)) {
     throw new Error('Malformed runs list response');
   }
+  // Runs-list entries are {workflowName, runId, snapshot, createdAt, updatedAt}
+  // — the run's status is nested inside the embedded snapshot.
   return raw.runs
-    .filter(
-      (r): r is Record<string, unknown> =>
-        isRecord(r) && typeof r.runId === 'string' && typeof r.status === 'string',
-    )
-    .map((r) => ({
-      runId: r.runId as string,
-      status: r.status as string,
-      createdAt: typeof r.createdAt === 'string' ? r.createdAt : '',
-      updatedAt: typeof r.updatedAt === 'string' ? r.updatedAt : '',
-    }));
+    .filter((r): r is Record<string, unknown> => isRecord(r) && typeof r.runId === 'string')
+    .map((r) => {
+      const snapshot = isRecord(r.snapshot) ? r.snapshot : {};
+      return {
+        runId: r.runId as string,
+        status:
+          typeof snapshot.status === 'string'
+            ? snapshot.status
+            : typeof r.status === 'string'
+              ? r.status
+              : 'unknown',
+        createdAt: typeof r.createdAt === 'string' ? r.createdAt : '',
+        updatedAt: typeof r.updatedAt === 'string' ? r.updatedAt : '',
+      };
+    });
 };
 
 /** Every stored interview run (built-in route): the ledger of interview ids. */
