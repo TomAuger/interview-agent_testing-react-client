@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { Alert, List, Paper, Text, UnstyledButton } from '@mantine/core';
 import { useClickOutside } from '@mantine/hooks';
 import type { Message } from '../types';
+import { SpeakButton } from './SpeakButton';
 import styles from './MessageList.module.css';
 
 interface MenuState {
@@ -67,9 +68,11 @@ function RollbackMenu({
 function MessageBubble({
   message,
   onMenu,
+  onSpeechError,
 }: {
   message: Message;
   onMenu: (state: MenuState) => void;
+  onSpeechError: (message: string) => void;
 }) {
   switch (message.role) {
     case 'bot':
@@ -77,6 +80,11 @@ function MessageBubble({
         <div className={`${styles.message} ${styles.bot}`}>
           {message.line !== undefined && <LineTag line={message.line} onMenu={onMenu} />}
           {message.text}
+          <SpeakButton
+            className={styles.speakBtn}
+            text={message.text}
+            onError={onSpeechError}
+          />
         </div>
       );
     case 'human':
@@ -126,6 +134,7 @@ export function MessageList({ messages, onRollback }: MessageListProps) {
   const endRef = useRef<HTMLDivElement>(null);
   const hydratedOnce = useRef(false);
   const [menu, setMenu] = useState<MenuState | null>(null);
+  const [speechError, setSpeechError] = useState<string | null>(null);
 
   useEffect(() => {
     if (messages.length === 0) return;
@@ -138,8 +147,24 @@ export function MessageList({ messages, onRollback }: MessageListProps) {
   return (
     <div className={styles.list} aria-live="polite">
       {messages.map((message) => (
-        <MessageBubble key={message.id} message={message} onMenu={setMenu} />
+        <MessageBubble
+          key={message.id}
+          message={message}
+          onMenu={setMenu}
+          onSpeechError={setSpeechError}
+        />
       ))}
+      {speechError !== null && (
+        <Alert
+          color="red"
+          variant="light"
+          className={styles.error}
+          withCloseButton
+          onClose={() => setSpeechError(null)}
+        >
+          {speechError}
+        </Alert>
+      )}
       <div ref={endRef} />
       {menu !== null && (
         <RollbackMenu

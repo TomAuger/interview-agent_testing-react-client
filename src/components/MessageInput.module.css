@@ -1,3 +1,9 @@
+.stack {
+  display: flex;
+  flex-direction: column;
+  gap: var(--mantine-spacing-xs);
+}
+
 .row {
   display: flex;
   gap: var(--mantine-spacing-sm);
@@ -11,4 +17,8 @@
 .loader {
   flex: none;
   margin-bottom: var(--mantine-spacing-sm);
+}
+
+.dictationError {
+  margin: 0;
 }

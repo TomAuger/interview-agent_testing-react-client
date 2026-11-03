@@ -18,6 +18,19 @@
   composes: message;
   align-self: flex-start;
   background: var(--mantine-color-gray-1);
+  position: relative;
+}
+
+.speakBtn {
+  position: absolute;
+  top: 2px;
+  right: -32px;
+  opacity: 0;
+}
+
+.bot:hover .speakBtn,
+.speakBtn[data-speaking='true'] {
+  opacity: 1;
 }
 
 .human {
