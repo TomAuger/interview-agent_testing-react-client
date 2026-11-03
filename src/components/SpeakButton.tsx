@@ -2,6 +2,32 @@ import { useEffect, useRef, useState } from 'react';
 import { ActionIcon } from '@mantine/core';
 import { SpeakerIcon, StopIcon } from './icons';
 
+// 'canceled'/'interrupted' just mean playback was stopped deliberately.
+const reportSpeechError = (
+  event: SpeechSynthesisErrorEvent,
+  onError: (message: string) => void,
+  source: string,
+): void => {
+  if (event.error !== 'canceled' && event.error !== 'interrupted') {
+    onError(`Could not read the message aloud: "${event.error}" (${source}).`);
+  }
+};
+
+/** Fire-and-forget playback of arbitrary text (e.g. from the turn menu). */
+export function speakText(text: string, onError: (message: string) => void): void {
+  if (!('speechSynthesis' in window)) {
+    onError(
+      'Read-aloud is unavailable: this browser has no speechSynthesis support (speakText in SpeakButton).',
+    );
+    return;
+  }
+  const utterance = new SpeechSynthesisUtterance(text);
+  utterance.onerror = (event) => reportSpeechError(event, onError, 'speakText in SpeakButton');
+  // Cancel anything already playing so clicks don't queue utterances.
+  window.speechSynthesis.cancel();
+  window.speechSynthesis.speak(utterance);
+}
+
 interface SpeakButtonProps {
   text: string;
   className?: string | undefined;
@@ -41,12 +67,7 @@ export function SpeakButton({ text, className, onError }: SpeakButtonProps) {
     utterance.onerror = (event) => {
       utteranceRef.current = null;
       setSpeaking(false);
-      // 'canceled'/'interrupted' just mean playback was stopped deliberately.
-      if (event.error !== 'canceled' && event.error !== 'interrupted') {
-        onErrorRef.current(
-          `Could not read the message aloud: "${event.error}" (utterance.onerror in SpeakButton).`,
-        );
-      }
+      reportSpeechError(event, onErrorRef.current, 'utterance.onerror in SpeakButton');
     };
     // Cancel anything already playing so clicks don't queue utterances; each
     // cancelled utterance gets an 'end' event, which resets its own button.
@@ -63,7 +84,11 @@ export function SpeakButton({ text, className, onError }: SpeakButtonProps) {
       variant="subtle"
       color="gray"
       size="sm"
-      onClick={toggle}
+      onClick={(event) => {
+        // Keep the click from reaching the bubble's own click-to-menu handler.
+        event.stopPropagation();
+        toggle();
+      }}
       title={speaking ? 'Stop reading' : 'Read aloud'}
       aria-label={speaking ? 'Stop reading this message' : 'Read this message aloud'}
     >

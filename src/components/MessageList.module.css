@@ -19,6 +19,7 @@
   align-self: flex-start;
   background: var(--mantine-color-gray-1);
   position: relative;
+  cursor: pointer;
 }
 
 .speakBtn {
@@ -60,14 +61,7 @@
   font-size: var(--mantine-font-size-xs);
   font-family: var(--mantine-font-family-monospace);
   opacity: 0.55;
-  cursor: context-menu;
   user-select: none;
-}
-
-.lineTag:hover {
-  opacity: 1;
-  background: var(--mantine-color-dark-1);
-  color: var(--mantine-color-white);
 }
 
 .menu {

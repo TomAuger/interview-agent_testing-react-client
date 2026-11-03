@@ -2,13 +2,14 @@ import { useEffect, useRef, useState } from 'react';
 import { Alert, List, Paper, Text, UnstyledButton } from '@mantine/core';
 import { useClickOutside } from '@mantine/hooks';
 import type { Message } from '../types';
-import { SpeakButton } from './SpeakButton';
+import { SpeakButton, speakText } from './SpeakButton';
 import styles from './MessageList.module.css';
 
 interface MenuState {
   x: number;
   y: number;
-  line: number;
+  line: number | undefined;
+  text: string;
 }
 
 interface MessageListProps {
@@ -16,27 +17,18 @@ interface MessageListProps {
   onRollback: (line: number) => void;
 }
 
-function LineTag({ line, onMenu }: { line: number; onMenu: (state: MenuState) => void }) {
-  return (
-    <span
-      className={styles.lineTag}
-      title={`Turn #${line} — right-click to roll back`}
-      onContextMenu={(event) => {
-        event.preventDefault();
-        onMenu({ x: event.clientX, y: event.clientY, line });
-      }}
-    >
-      #{line}
-    </span>
-  );
+function LineTag({ line }: { line: number }) {
+  return <span className={styles.lineTag}>#{line}</span>;
 }
 
-function RollbackMenu({
+function TurnMenu({
   menu,
+  onSpeak,
   onSelect,
   onClose,
 }: {
   menu: MenuState;
+  onSpeak: () => void;
   onSelect: () => void;
   onClose: () => void;
 }) {
@@ -58,9 +50,14 @@ function RollbackMenu({
       shadow="md"
       withBorder
     >
-      <UnstyledButton className={styles.menuItem} onClick={onSelect}>
-        Roll back to this turn
+      <UnstyledButton className={styles.menuItem} onClick={onSpeak}>
+        Speak this
       </UnstyledButton>
+      {menu.line !== undefined && (
+        <UnstyledButton className={styles.menuItem} onClick={onSelect}>
+          Roll back to this turn
+        </UnstyledButton>
+      )}
     </Paper>
   );
 }
@@ -77,8 +74,21 @@ function MessageBubble({
   switch (message.role) {
     case 'bot':
       return (
-        <div className={`${styles.message} ${styles.bot}`}>
-          {message.line !== undefined && <LineTag line={message.line} onMenu={onMenu} />}
+        <div
+          className={`${styles.message} ${styles.bot}`}
+          title="Click for options"
+          onClick={(event) => {
+            // Don't hijack clicks where the user is selecting text to copy.
+            if (window.getSelection()?.toString() !== '') return;
+            onMenu({
+              x: event.clientX,
+              y: event.clientY,
+              line: message.line,
+              text: message.text,
+            });
+          }}
+        >
+          {message.line !== undefined && <LineTag line={message.line} />}
           {message.text}
           <SpeakButton
             className={styles.speakBtn}
@@ -89,10 +99,7 @@ function MessageBubble({
       );
     case 'human':
       return (
-        <div className={`${styles.message} ${styles.human}`}>
-          {message.line !== undefined && <LineTag line={message.line} onMenu={onMenu} />}
-          {message.text}
-        </div>
+        <div className={`${styles.message} ${styles.human}`}>{message.text}</div>
       );
     case 'error':
       return (
@@ -167,12 +174,18 @@ export function MessageList({ messages, onRollback }: MessageListProps) {
       )}
       <div ref={endRef} />
       {menu !== null && (
-        <RollbackMenu
+        <TurnMenu
           menu={menu}
           onClose={() => setMenu(null)}
+          onSpeak={() => {
+            setMenu(null);
+            speakText(menu.text, setSpeechError);
+          }}
           onSelect={() => {
             setMenu(null);
-            onRollback(menu.line);
+            if (menu.line !== undefined) {
+              onRollback(menu.line);
+            }
           }}
         />
       )}
