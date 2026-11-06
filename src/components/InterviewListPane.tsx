@@ -6,6 +6,8 @@ interface InterviewListPaneProps {
   interviews: InterviewRunSummary[];
   activeId: string | null;
   isLoading: boolean;
+  /** Pane width in px, controlled by the resizable-layout parent. */
+  width: number;
   onSelect: (interviewId: string) => void;
   onNew: () => void;
   onRefresh: () => void;
@@ -47,12 +49,13 @@ export function InterviewListPane({
   interviews,
   activeId,
   isLoading,
+  width,
   onSelect,
   onNew,
   onRefresh,
 }: InterviewListPaneProps) {
   return (
-    <aside className={styles.pane}>
+    <aside className={styles.pane} style={{ width }}>
       <Group justify="space-between" className={styles.header}>
         <Text size="sm" fw={600}>
           Interviews

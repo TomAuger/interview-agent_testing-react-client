@@ -63,3 +63,18 @@ does not allow cross-origin requests.
   errors; the interview does not advance, so you can retry.
 - The test-harness routes mount outside `/api` (`/interviews/...`); the dev server
   proxies both prefixes to `agent-server`.
+- The right-hand **Inspector** pane (dev builds only, `import.meta.env.DEV`)
+  streams `GET /interviews/:id/dev-stream` (SSE) and shows the interview's
+  internal ledger as a live tree: profile topics with per-topic progress,
+  planned and follow-up questions with status, dropped proposals as dashed
+  "ghost" rows (follow-ups beyond the depth bound, trimmed planner intents),
+  corrections applied/rejected, required-topic coverage, turn counts, and the
+  judge's gap report on completion. Click a question for its intent, phrased
+  text, summary and analyst directive; the bottom panel shows the current
+  in-flight model call and recent calls' structured outputs. Selecting any
+  stored interview rebuilds the tree from `GET /interviews/:id/dev-state`;
+  after an `agent-server` restart the tree still rebuilds but recorded call
+  history and ghosts reset (they live only in server memory).
+- Both side panes are resizable: drag the gutter between the panes (widths
+  persist to `localStorage`). The Inspector's topic progress bars collapse to
+  `done/planned` counts below ~340px.

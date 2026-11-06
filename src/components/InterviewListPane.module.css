@@ -1,7 +1,6 @@
 .pane {
   display: flex;
   flex-direction: column;
-  width: 240px;
   flex: none;
   border-right: 1px solid var(--mantine-color-gray-3);
   background: var(--mantine-color-gray-0);

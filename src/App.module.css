@@ -10,3 +10,16 @@
   flex-direction: column;
   min-height: 0;
 }
+
+.gutter {
+  flex: none;
+  width: 5px;
+  cursor: col-resize;
+  touch-action: none;
+  background: transparent;
+}
+
+.gutter:hover,
+.gutter:active {
+  background: var(--mantine-color-blue-3);
+}

@@ -14,7 +14,9 @@ import {
   startInterview,
 } from './api/client';
 import { ChatScreen } from './components/ChatScreen';
+import { DevPane } from './components/DevPane';
 import { InterviewListPane } from './components/InterviewListPane';
+import { useResizableWidth } from './hooks/useResizableWidth';
 import { StartScreen } from './components/StartScreen';
 import { clearStoredId, readStoredId, storeId } from './storage';
 import type { Action, InterviewState, Message } from './types';
@@ -156,6 +158,20 @@ export default function App() {
   const hydrated = useRef(false);
   const [interviews, setInterviews] = useState<InterviewRunSummary[]>([]);
   const [listLoading, setListLoading] = useState(false);
+  const listPane = useResizableWidth({
+    initial: 240,
+    min: 180,
+    max: 420,
+    side: 'left',
+    storageKey: 'interview-ui/listPaneWidth',
+  });
+  const devPane = useResizableWidth({
+    initial: 380,
+    min: 300,
+    max: 640,
+    side: 'right',
+    storageKey: 'interview-ui/devPaneWidth',
+  });
 
   const refreshList = useCallback(async (): Promise<void> => {
     setListLoading(true);
@@ -323,9 +339,17 @@ export default function App() {
         interviews={interviews}
         activeId={state.interviewId}
         isLoading={listLoading}
+        width={listPane.width}
         onSelect={(id) => void joinAndHydrate(id)}
         onNew={startOver}
         onRefresh={() => void refreshList()}
+      />
+      <div
+        className={styles.gutter}
+        role="separator"
+        aria-orientation="vertical"
+        title="Drag to resize"
+        {...listPane.gutterProps}
       />
       <main className={styles.mainPane}>
         {state.phase === 'start' ? (
@@ -364,6 +388,18 @@ export default function App() {
           />
         )}
       </main>
+      {import.meta.env.DEV && (
+        <>
+          <div
+            className={styles.gutter}
+            role="separator"
+            aria-orientation="vertical"
+            title="Drag to resize"
+            {...devPane.gutterProps}
+          />
+          <DevPane interviewId={state.interviewId} width={devPane.width} />
+        </>
+      )}
     </div>
   );
 }
