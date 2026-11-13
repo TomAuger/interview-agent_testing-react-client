@@ -139,8 +139,9 @@ const messagesFromTranscript = (transcript: InterviewTranscript): Message[] => {
     }
   }
   if (transcript.pending !== null) {
-    // The pending prompt has no answer yet — shown without a line tag.
-    messages.push({ id: newMessageId(), role: 'bot', text: transcript.pending.askedText });
+    // The pending prompt heads the next turn, so its line is the number of recorded turns.
+    const line = transcript.messages.filter((entry) => entry.kind === 'question').length;
+    messages.push({ id: newMessageId(), role: 'bot', text: transcript.pending.askedText, line });
   }
   if (transcript.completion !== null) {
     messages.push({
@@ -303,7 +304,16 @@ export default function App() {
     if (interviewId === null || pendingPromptId === null) return;
     dispatch({ type: 'SUBMIT_ANSWER', id: newMessageId(), text });
     try {
-      applyRun(await resumeInterview(interviewId, pendingPromptId, text));
+      const run = await resumeInterview(interviewId, pendingPromptId, text);
+      const kind = run.suspendPayload?.kind;
+      if (run.status === 'success' || kind === 'question') {
+        // Reload the persisted transcript so every bubble carries its turn line
+        // (the rollback target); the run response alone has no line numbers.
+        await hydrate(interviewId);
+        if (run.status === 'success') void refreshList();
+      } else {
+        applyRun(run);
+      }
     } catch {
       dispatch({ type: 'API_ERROR', error: NETWORK_ERROR });
     }

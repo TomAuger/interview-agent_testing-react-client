@@ -13,7 +13,6 @@ import styles from './DevPane.module.css';
 const VISIBLE_CALLS = 12;
 
 const TASK_LABEL: Record<DevCall['task'], string> = {
-  plan: 'planner',
   analyze: 'analyst',
   phrase: 'phraser',
   judge: 'judge',

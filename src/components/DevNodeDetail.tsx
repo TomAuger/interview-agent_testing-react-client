@@ -1,11 +1,13 @@
 /**
  * Detail card for the selected tree node: the intent behind a question, the
  * text actually phrased, the analyst's directive and summary for its turn,
- * corrections (applied and rejected), and the follow-up proposal including
- * why a dropped one never materialised.
+ * corrections (applied and rejected), and the next-question proposal
+ * including why a dropped one never materialised. For a criterion: its
+ * status, what is known, the quoted evidence and when it was learned.
  */
 import { Badge, Code, Group, Text } from '@mantine/core';
-import type { DevQuestion, DevTree } from '../api/dev';
+import type { DevCriterion, DevQuestion, DevTopic, DevTree } from '../api/dev';
+import { CRITERION_LABEL } from './DevCriteria';
 import type { DevSelection } from './DevTree';
 import styles from './DevPane.module.css';
 
@@ -44,15 +46,20 @@ function QuestionDetail({ question }: { question: DevQuestion }) {
             follow-up
           </Badge>
         )}
+        {question.kind === 'confirm' && (
+          <Badge size="xs" variant="outline" color="grape">
+            confirm
+          </Badge>
+        )}
       </Group>
-      {question.followUpIntent !== undefined && (
-        <Field label="follow-up proposed">
-          {question.followUpIntent.intent}
-          <Text size="xs" c={question.followUpIntent.applied ? 'green' : 'orange'} span>
+      {question.nextIntent !== undefined && (
+        <Field label="next question proposed">
+          {question.nextIntent.intent}
+          <Text size="xs" c={question.nextIntent.applied ? 'green' : 'orange'} span>
             {' '}
-            {question.followUpIntent.applied
+            {question.nextIntent.applied
               ? '(created)'
-              : `(dropped — ${question.followUpIntent.droppedReason ?? 'bound'})`}
+              : `(dropped — ${question.nextIntent.droppedReason ?? 'topic closed'})`}
           </Text>
         </Field>
       )}
@@ -64,6 +71,35 @@ function QuestionDetail({ question }: { question: DevQuestion }) {
       ))}
       <Field label="id">
         <Code>{question.id}</Code>
+      </Field>
+    </>
+  );
+}
+
+function CriterionDetail({ criterion, topic }: { criterion: DevCriterion; topic: DevTopic }) {
+  return (
+    <>
+      <Field label="criterion">{criterion.text}</Field>
+      <Field label="topic">{topic.goal}</Field>
+      <Group gap="xs" className={styles.detailRow}>
+        <Badge size="xs" variant="light" color="gray">
+          {CRITERION_LABEL[criterion.status]}
+        </Badge>
+        {criterion.volunteered && (
+          <Badge size="xs" variant="light" color="grape">
+            volunteered
+          </Badge>
+        )}
+      </Group>
+      {criterion.note !== undefined && <Field label="known">{criterion.note}</Field>}
+      {criterion.evidence !== undefined && (
+        <Field label="evidence">&ldquo;{criterion.evidence}&rdquo;</Field>
+      )}
+      {criterion.lastChangedTurn !== undefined && (
+        <Field label="learned at turn">{String(criterion.lastChangedTurn)}</Field>
+      )}
+      <Field label="id">
+        <Code>{criterion.id}</Code>
       </Field>
     </>
   );
@@ -89,7 +125,28 @@ export function DevNodeDetail({
             <Field label="directive">{tree.overview.directive}</Field>
           )}
           <Field label="answered">{tree.overview.answered ? 'yes' : 'no'}</Field>
+          {tree.overview.credited.length > 0 && (
+            <Field label="credited">
+              {tree.topics
+                .flatMap((t) => t.criteria)
+                .filter((c) => tree.overview.credited.includes(c.id))
+                .map((c) => c.text)
+                .join('; ')}
+            </Field>
+          )}
         </>
+      ) : selected.kind === 'criterion' ? (
+        (() => {
+          const topic = tree.topics.find((t) => t.criteria.some((c) => c.id === selected.criterionId));
+          const criterion = topic?.criteria.find((c) => c.id === selected.criterionId);
+          return topic !== undefined && criterion !== undefined ? (
+            <CriterionDetail criterion={criterion} topic={topic} />
+          ) : (
+            <Text size="xs" c="dimmed">
+              Criterion no longer in the tree.
+            </Text>
+          );
+        })()
       ) : (
         (() => {
           const question = tree.topics

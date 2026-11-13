@@ -1,19 +1,39 @@
 /**
  * The interview ledger rendered as a tree: overview node, profile topics
- * (collapsible, ordered as seeded) with their planned and follow-up
- * questions, plus dashed "ghost" rows for proposals the model made that
- * never reached the ledger.
+ * (collapsible, ordered as seeded) each with its understanding verdict,
+ * criteria checklist and questions, plus dashed "ghost" rows for proposals
+ * the model made that never reached the ledger.
  */
 import { useState } from 'react';
-import { Badge, Progress, Text, UnstyledButton } from '@mantine/core';
-import type { DevGhost, DevQuestion, DevTopic, DevTree } from '../api/dev';
+import { Badge, Text, UnstyledButton } from '@mantine/core';
+import type { DevGhost, DevQuestion, DevTopic, DevTopicVerdict, DevTree } from '../api/dev';
+import { CriteriaBar, CriteriaList } from './DevCriteria';
 import styles from './DevPane.module.css';
 
 /** What the pane treats as selectable. */
 export type DevSelection =
   | { kind: 'overview' }
   | { kind: 'question'; questionId: string }
+  | { kind: 'criterion'; criterionId: string }
   | null;
+
+const VERDICT_COLOR: Record<DevTopicVerdict, string> = {
+  queued: 'gray',
+  open: 'blue',
+  confirming: 'grape',
+  satisfied: 'green',
+  exhausted: 'orange',
+  skipped: 'teal',
+};
+
+const VERDICT_HELP: Record<DevTopicVerdict, string> = {
+  queued: 'not reached yet',
+  open: 'still asking',
+  confirming: 'confirming what was said earlier',
+  satisfied: 'understood well enough for its rigour',
+  exhausted: 'moved on: allowance spent or no progress',
+  skipped: 'already understood from earlier answers, nothing asked',
+};
 
 const STATUS_CLASS: Record<DevQuestion['status'], string | undefined> = {
   pending: styles.statusPending,
@@ -33,11 +53,11 @@ function GhostRow({ ghost }: { ghost: DevGhost }) {
   return (
     <div className={styles.ghostRow}>
       <Text size="xs" c="dimmed" fs="italic" className={styles.intent}>
-        {ghost.kind === 'followup-dropped' ? '↳ ' : '◇ '}
+        {ghost.kind === 'next-intent-dropped' ? '↳ ' : '⚠ '}
         {ghost.intent}
       </Text>
-      <Text size="xs" c="dimmed" fs="italic" style={{ flex: 'none' }}>
-        {ghost.kind === 'followup-dropped' ? 'dropped' : ghost.kind === 'planned-trimmed' ? 'trimmed' : 'no topic'}
+      <Text size="xs" c="dimmed" fs="italic" style={{ flex: 'none' }} title={ghost.reason}>
+        {ghost.kind === 'next-intent-dropped' ? 'dropped' : 'rejected'}
       </Text>
     </div>
   );
@@ -79,6 +99,11 @@ function QuestionRow({
           follow-up
         </Badge>
       )}
+      {question.kind === 'confirm' && (
+        <Badge size="xs" variant="outline" color="grape">
+          confirm
+        </Badge>
+      )}
       {isPending && (
         <Badge size="xs" variant="filled" color="blue">
           asked
@@ -92,6 +117,7 @@ function TopicSection({
   topic,
   ghosts,
   pendingQuestionId,
+  latestTurn,
   narrow,
   selected,
   onSelect,
@@ -99,19 +125,22 @@ function TopicSection({
   topic: DevTopic;
   ghosts: DevGhost[];
   pendingQuestionId: string | null;
-  /** Hide the mini progress bar at tight pane widths. */
+  /** The ledger's turn count, to highlight criteria changed by the latest turn. */
+  latestTurn: number;
+  /** Hide the criteria bar and rigour at tight pane widths. */
   narrow: boolean;
   selected: DevSelection;
   onSelect: (sel: DevSelection) => void;
 }) {
   const [open, setOpen] = useState(true);
-  const done = topic.counts.answered + topic.counts.skipped;
-  const pct = topic.counts.planned === 0 ? 0 : (done / topic.counts.planned) * 100;
+  const { resolved, total } = topic.satisfaction;
 
   const roots = topic.questions.filter((q) => q.followUpOf === undefined);
   const childrenOf = (id: string) =>
     topic.questions.filter((q) => q.followUpOf === id);
-  const topicGhosts = ghosts.filter((g) => g.topicId === topic.id && g.parentQuestionId === undefined);
+  const topicGhosts = ghosts.filter(
+    (g) => g.topicId === topic.id && g.parentQuestionId === undefined,
+  );
   const ghostChildrenOf = (id: string) =>
     ghosts.filter((g) => g.topicId === topic.id && g.parentQuestionId === id);
 
@@ -138,37 +167,51 @@ function TopicSection({
           ▶
         </Text>
         <Text size="xs" fw={600} className={styles.topicTitle} truncate>
-          {topic.title}
+          {topic.goal}
         </Text>
-        {topic.required && (
-          <Badge size="xs" variant="outline" color={topic.covered ? 'green' : 'orange'}>
-            {topic.covered ? 'covered' : 'required'}
-          </Badge>
+        <Badge
+          size="xs"
+          variant={topic.current ? 'filled' : 'light'}
+          color={VERDICT_COLOR[topic.verdict]}
+          title={VERDICT_HELP[topic.verdict]}
+        >
+          {topic.verdict}
+        </Badge>
+        {!narrow && (
+          <Text size="xs" c="dimmed" className={styles.verdictMeta} title="rigour · turns used / allowance">
+            {topic.rigour} · {topic.turnsUsed}/{topic.allowance}
+          </Text>
         )}
         {narrow ? (
           <Text size="xs" c="dimmed" style={{ flex: 'none' }}>
-            {done}/{topic.counts.planned}
+            {resolved}/{total}
           </Text>
         ) : (
-          <div className={styles.topicProgress}>
-            <Progress
-              size="sm"
-              value={pct}
-              color={topic.covered ? 'green' : 'blue'}
-              aria-label={`${String(done)} of ${String(topic.counts.planned)} done`}
-            />
+          <div title={`${String(resolved)} of ${String(total)} criteria resolved`}>
+            <CriteriaBar criteria={topic.criteria} />
           </div>
         )}
       </UnstyledButton>
       {open && (
         <>
+          <CriteriaList
+            criteria={topic.criteria}
+            latestTurn={latestTurn}
+            selected={selected}
+            onSelect={onSelect}
+          />
+          {topic.stallStreak > 0 && topic.verdict === 'open' && (
+            <Text size="xs" c="orange" pl={18} fs="italic">
+              no progress for {topic.stallStreak} turn{topic.stallStreak === 1 ? '' : 's'}
+            </Text>
+          )}
           {roots.map((q) => renderQuestion(q, 0))}
           {topicGhosts.map((g, i) => (
             <GhostRow key={`tghost-${String(i)}`} ghost={g} />
           ))}
           {topic.counts.planned === 0 && topicGhosts.length === 0 && (
             <Text size="xs" c="dimmed" pl={18} fs="italic">
-              no questions yet
+              {topic.verdict === 'queued' ? 'not reached yet' : 'no questions asked'}
             </Text>
           )}
         </>
@@ -205,10 +248,20 @@ export function DevTree({
         <Text size="xs" className={styles.intent} fw={500}>
           {tree.overview.question}
         </Text>
+        {tree.overview.credited.length > 0 && (
+          <Badge size="xs" variant="light" color="grape" title="criteria credited by the overview answer">
+            +{tree.overview.credited.length} credited
+          </Badge>
+        )}
         <Badge size="xs" variant="outline" color="gray">
           overview
         </Badge>
       </UnstyledButton>
+      {tree.ghosts
+        .filter((g) => g.topicId === '')
+        .map((g, i) => (
+          <GhostRow key={`unscoped-${String(i)}`} ghost={g} />
+        ))}
 
       {tree.topics.map((topic) => (
         <TopicSection
@@ -216,6 +269,7 @@ export function DevTree({
           topic={topic}
           ghosts={tree.ghosts}
           pendingQuestionId={tree.pending?.questionId ?? null}
+          latestTurn={tree.turnsUsed}
           narrow={narrow}
           selected={selected}
           onSelect={onSelect}

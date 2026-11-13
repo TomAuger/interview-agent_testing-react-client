@@ -7,6 +7,7 @@
  * questions, follow-ups, statuses, progress — plus the model calls the
  * server-side recorder captured while a pane was connected.
  *
+ * Topics carry their criteria checklist, rigour and understanding verdict.
  * Types mirror the server's `InterviewTree`/`DevSnapshot` shapes but are
  * hand-parsed in the same defensive style as `client.ts` — there is no
  * shared package between the projects.
@@ -24,7 +25,8 @@ export interface DevCorrection {
   applied: boolean;
 }
 
-export interface DevFollowUpProposal {
+/** What the analyst proposed as the next question after a turn. */
+export interface DevNextIntent {
   intent: string;
   applied: boolean;
   droppedReason?: string;
@@ -36,12 +38,41 @@ export interface DevQuestion {
   intent: string;
   status: DevQuestionStatus;
   followUpOf?: string;
+  /** `confirm`: re-checks what the participant volunteered earlier. */
+  kind?: 'confirm';
   askedText?: string;
   answerSummary?: string;
   directive?: DevDirective;
   corrections: DevCorrection[];
-  followUpIntent?: DevFollowUpProposal;
+  nextIntent?: DevNextIntent;
 }
+
+export type DevCriterionStatus = 'unknown' | 'vague' | 'clear' | 'declined';
+
+/** One criterion of a topic's "understood" checklist. */
+export interface DevCriterion {
+  id: string;
+  text: string;
+  status: DevCriterionStatus;
+  note?: string;
+  evidence?: string;
+  sourceTurnId?: string;
+  /** Learned while a different topic (or the overview) was active. */
+  volunteered: boolean;
+  /** `turnsUsed` after the turn that last changed it. */
+  lastChangedTurn?: number;
+}
+
+/** `queued`: not reached yet; `skipped`: understood without asking anything. */
+export type DevTopicVerdict =
+  | 'queued'
+  | 'open'
+  | 'confirming'
+  | 'satisfied'
+  | 'exhausted'
+  | 'skipped';
+
+export type DevRigour = 'glance' | 'light' | 'standard' | 'thorough' | 'exhaustive';
 
 export interface DevTopicCounts {
   planned: number;
@@ -54,16 +85,28 @@ export interface DevTopicCounts {
 
 export interface DevTopic {
   id: string;
-  title: string;
+  goal: string;
   required: boolean;
+  rigour: DevRigour;
+  verdict: DevTopicVerdict;
+  /** The interview is currently working on this topic. */
+  current: boolean;
+  turnsUsed: number;
+  /** Turns the topic may use in total, as things stand. */
+  allowance: number;
+  /** Consecutive topic turns with no criterion improving. */
+  stallStreak: number;
+  satisfaction: { resolved: number; total: number; requiredFraction: number };
   covered: boolean;
   counts: DevTopicCounts;
+  criteria: DevCriterion[];
   questions: DevQuestion[];
 }
 
 /** A proposal that never reached the ledger (annotation-only). */
 export interface DevGhost {
-  kind: 'followup-dropped' | 'planned-trimmed' | 'planned-unknown-topic';
+  kind: 'next-intent-dropped' | 'credit-rejected';
+  /** Empty when the proposal named no known topic. */
   topicId: string;
   parentQuestionId?: string;
   intent: string;
@@ -81,6 +124,8 @@ export interface DevTree {
     answered: boolean;
     answerSummary?: string;
     directive?: DevDirective;
+    /** Criterion ids the overview answer credited. */
+    credited: string[];
   };
   topics: DevTopic[];
   ghosts: DevGhost[];
@@ -92,9 +137,11 @@ export interface DevTree {
     closing?: string;
   } | null;
   coverage: { covered: string[]; missing: string[] };
+  /** Resolved criteria across all topics. */
+  criteriaSummary: { resolved: number; total: number };
 }
 
-export type DevCallTask = 'plan' | 'analyze' | 'phrase' | 'judge' | 'writeArtifact' | 'vary';
+export type DevCallTask = 'analyze' | 'phrase' | 'judge' | 'writeArtifact' | 'vary';
 export type DevCallStatus = 'in-flight' | 'ok' | 'error';
 
 /** One recorded model call, for the agent-activity panel. */

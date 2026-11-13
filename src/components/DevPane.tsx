@@ -1,7 +1,8 @@
 /**
  * The developer inspector pane: a live view of the interview's internal
- * ledger — topic/question tree, follow-ups (created and dropped),
- * corrections, progress — streamed over the dev SSE channel, plus the
+ * ledger — topics with their criteria checklists and understanding
+ * verdicts, questions, follow-ups (created and dropped), corrections,
+ * progress — streamed over the dev SSE channel, plus the
  * agent-activity panel. Rendered only in dev builds (`import.meta.env.DEV`)
  * for the local test client; never for production.
  */
@@ -19,9 +20,6 @@ const PHASE_COLOR: Record<string, string> = {
   topics: 'blue',
   closed: 'gray',
 };
-
-const skippedCount = (tree: { topics: { counts: { skipped: number } }[] }): number =>
-  tree.topics.reduce((n, t) => n + t.counts.skipped, 0);
 
 export function DevPane({
   interviewId,
@@ -53,13 +51,11 @@ export function DevPane({
 
   const answeredCount =
     tree?.topics.reduce((n, t) => n + t.counts.answered, 0) ?? 0;
-  const plannedCount = tree?.topics.reduce((n, t) => n + t.counts.planned, 0) ?? 0;
   const requiredCount = tree?.topics.filter((t) => t.required).length ?? 0;
   const coveredCount = tree?.coverage.covered.length ?? 0;
-  const overallPct =
-    tree === null || plannedCount === 0
-      ? 0
-      : ((answeredCount + skippedCount(tree)) / plannedCount) * 100;
+  const resolvedCount = tree?.criteriaSummary.resolved ?? 0;
+  const totalCriteria = tree?.criteriaSummary.total ?? 0;
+  const overallPct = totalCriteria === 0 ? 0 : (resolvedCount / totalCriteria) * 100;
 
   return (
     <aside className={styles.pane} style={{ width }}>
@@ -110,7 +106,7 @@ export function DevPane({
                 turns {tree.turnsUsed}/{tree.maxTurns}
               </Text>
               <Text size="xs" c="dimmed">
-                {answeredCount} answered · {plannedCount} planned
+                {resolvedCount}/{totalCriteria} criteria · {answeredCount} answered
               </Text>
               <Text size="xs" c="dimmed">
                 required {coveredCount}/{requiredCount}
