@@ -310,7 +310,8 @@ export default function App() {
         // Reload the persisted transcript so every bubble carries its turn line
         // (the rollback target); the run response alone has no line numbers.
         await hydrate(interviewId);
-        if (run.status === 'success') void refreshList();
+        // Refresh every turn: the seed answer may have titled the interview.
+        void refreshList();
       } else {
         applyRun(run);
       }

@@ -18,6 +18,7 @@ const TASK_LABEL: Record<DevCall['task'], string> = {
   judge: 'judge',
   writeArtifact: 'artifact',
   vary: 'varier',
+  title: 'titler',
 };
 
 const STATUS_COLOR: Record<DevCall['status'], string> = {

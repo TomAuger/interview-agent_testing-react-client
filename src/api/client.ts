@@ -86,10 +86,15 @@ export interface InterviewTranscript {
   } | null;
 }
 
-/** One entry in the built-in workflow runs list — the interview id ledger. */
+/** One display summary from the `GET /interviews` test-harness route. */
 export interface InterviewRunSummary {
-  runId: string;
+  interviewId: string;
   status: string;
+  profileId: string;
+  /** Humanised profile id (`product-feature` -> `Product Feature`). */
+  typeLabel: string;
+  /** Generated title, or null before the overview answer / on old runs. */
+  title: string | null;
   createdAt: string;
   updatedAt: string;
 }
@@ -309,35 +314,54 @@ const parseTranscript = (raw: unknown): InterviewTranscript => {
 export const getTranscript = async (interviewId: string): Promise<InterviewTranscript> =>
   parseTranscript(await request(`/interviews/${encodeURIComponent(interviewId)}`));
 
-const parseInterviewRuns = (raw: unknown): InterviewRunSummary[] => {
+const parseInterviewRun = (raw: unknown): InterviewRunSummary | undefined => {
+  if (!isRecord(raw) || typeof raw.interviewId !== 'string') return undefined;
+  return {
+    interviewId: raw.interviewId,
+    status: typeof raw.status === 'string' ? raw.status : 'unknown',
+    profileId: typeof raw.profileId === 'string' ? raw.profileId : '',
+    typeLabel: typeof raw.typeLabel === 'string' ? raw.typeLabel : 'Interview',
+    title: typeof raw.title === 'string' ? raw.title : null,
+    createdAt: typeof raw.createdAt === 'string' ? raw.createdAt : '',
+    updatedAt: typeof raw.updatedAt === 'string' ? raw.updatedAt : '',
+  };
+};
+
+const parseInterviewSummaries = (raw: unknown): InterviewRunSummary[] => {
+  if (!isRecord(raw) || !Array.isArray(raw.interviews)) {
+    throw new Error('Malformed interview list response');
+  }
+  return raw.interviews
+    .map(parseInterviewRun)
+    .filter((r): r is InterviewRunSummary => r !== undefined);
+};
+
+/** Reference into a built-in workflow runs list (artifact attempts). */
+interface WorkflowRunRef {
+  runId: string;
+  createdAt: string;
+}
+
+// Built-in runs-list entries are {workflowName, runId, snapshot, createdAt,
+// updatedAt}.
+const parseWorkflowRunRefs = (raw: unknown): WorkflowRunRef[] => {
   if (!isRecord(raw) || !Array.isArray(raw.runs)) {
     throw new Error('Malformed runs list response');
   }
-  // Runs-list entries are {workflowName, runId, snapshot, createdAt, updatedAt}
-  // — the run's status is nested inside the embedded snapshot.
   return raw.runs
     .filter((r): r is Record<string, unknown> => isRecord(r) && typeof r.runId === 'string')
-    .map((r) => {
-      const snapshot = isRecord(r.snapshot) ? r.snapshot : {};
-      return {
-        runId: r.runId as string,
-        status:
-          typeof snapshot.status === 'string'
-            ? snapshot.status
-            : typeof r.status === 'string'
-              ? r.status
-              : 'unknown',
-        createdAt: typeof r.createdAt === 'string' ? r.createdAt : '',
-        updatedAt: typeof r.updatedAt === 'string' ? r.updatedAt : '',
-      };
-    });
+    .map((r) => ({
+      runId: r.runId as string,
+      createdAt: typeof r.createdAt === 'string' ? r.createdAt : '',
+    }));
 };
 
-/** Every stored interview run (built-in route): the ledger of interview ids. */
+/**
+ * Every stored interview with its display summary (type label, generated
+ * title). Test-harness route mounted outside `/api` — `/interviews`.
+ */
 export const listInterviews = async (): Promise<InterviewRunSummary[]> =>
-  parseInterviewRuns(
-    await request(`/api/workflows/${INTERVIEW_WORKFLOW_ID}/runs?perPage=100`),
-  );
+  parseInterviewSummaries(await request('/interviews'));
 
 /**
  * Roll an interview back to a turn line (erases that turn's answer and all
@@ -378,7 +402,7 @@ export const regenerateArtifact = async (interviewId: string): Promise<{ runId: 
  */
 export const getLatestArtifactStatus = async (interviewId: string): Promise<ArtifactRun> => {
   const raw = await request(`/api/workflows/${ARTIFACT_WORKFLOW_ID}/runs?perPage=100`);
-  const latest = parseInterviewRuns(raw)
+  const latest = parseWorkflowRunRefs(raw)
     .filter((r) => r.runId === interviewId || r.runId.startsWith(`${interviewId}-a`))
     .sort((a, b) => Date.parse(b.createdAt) - Date.parse(a.createdAt))[0]?.runId;
   if (latest === undefined) {

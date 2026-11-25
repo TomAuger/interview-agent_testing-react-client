@@ -141,7 +141,7 @@ export interface DevTree {
   criteriaSummary: { resolved: number; total: number };
 }
 
-export type DevCallTask = 'analyze' | 'phrase' | 'judge' | 'writeArtifact' | 'vary';
+export type DevCallTask = 'analyze' | 'phrase' | 'judge' | 'writeArtifact' | 'vary' | 'title';
 export type DevCallStatus = 'in-flight' | 'ok' | 'error';
 
 /** One recorded model call, for the agent-activity panel. */

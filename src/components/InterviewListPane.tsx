@@ -1,5 +1,17 @@
-import { Badge, Button, Group, Loader, ScrollArea, Text, UnstyledButton } from '@mantine/core';
+import {
+  Badge,
+  Button,
+  Group,
+  HoverCard,
+  Loader,
+  ScrollArea,
+  Text,
+  UnstyledButton,
+} from '@mantine/core';
+import { useClipboard } from '@mantine/hooks';
+import { notifications } from '@mantine/notifications';
 import type { InterviewRunSummary } from '../api/client';
+import { CopyIcon } from './icons';
 import styles from './InterviewListPane.module.css';
 
 interface InterviewListPaneProps {
@@ -21,6 +33,14 @@ const STATUS_COLORS: Record<string, string> = {
   canceled: 'gray',
 };
 
+/** Row label: `<Type>: <generated title>`, or `<Type>: <id>` until one exists. */
+const rowLabel = (run: InterviewRunSummary): string =>
+  `${run.typeLabel}: ${run.title ?? run.interviewId}`;
+
+/** Hover-card content: `<title> · <id>`, or just the id while untitled. */
+const cardLabel = (run: InterviewRunSummary): string =>
+  run.title === null ? run.interviewId : `${run.title} · ${run.interviewId}`;
+
 function RunRow({
   run,
   isActive,
@@ -30,18 +50,37 @@ function RunRow({
   isActive: boolean;
   onSelect: (id: string) => void;
 }) {
+  const clipboard = useClipboard();
+  const copyId = (): void => {
+    clipboard.copy(run.interviewId);
+    notifications.show({ message: 'Interview ID copied' });
+  };
   return (
-    <UnstyledButton
-      className={`${styles.row} ${isActive ? styles.active : ''}`}
-      onClick={() => onSelect(run.runId)}
-    >
-      <Text size="xs" ff="monospace" className={styles.runId} title={run.runId}>
-        {run.runId}
-      </Text>
-      <Badge size="xs" variant="light" color={STATUS_COLORS[run.status] ?? 'gray'}>
-        {run.status}
-      </Badge>
-    </UnstyledButton>
+    <HoverCard openDelay={200} closeDelay={300} position="bottom-start" offset={-10} withinPortal>
+      <HoverCard.Target>
+        <UnstyledButton
+          className={`${styles.row} ${isActive ? styles.active : ''}`}
+          onClick={() => onSelect(run.interviewId)}
+        >
+          <Text size="xs" className={styles.runId}>
+            {rowLabel(run)}
+          </Text>
+          <Badge size="xs" variant="light" color={STATUS_COLORS[run.status] ?? 'gray'}>
+            {run.status}
+          </Badge>
+        </UnstyledButton>
+      </HoverCard.Target>
+      <HoverCard.Dropdown className={styles.dropdown}>
+        <UnstyledButton className={styles.copyButton} onClick={copyId} title="Click to copy">
+          <Text size="xs" ff="monospace">
+            {cardLabel(run)}
+          </Text>
+          <span className={styles.copyIcon}>
+            <CopyIcon />
+          </span>
+        </UnstyledButton>
+      </HoverCard.Dropdown>
+    </HoverCard>
   );
 }
 
@@ -74,7 +113,12 @@ export function InterviewListPane({
           </Text>
         )}
         {interviews.map((run) => (
-          <RunRow key={run.runId} run={run} isActive={run.runId === activeId} onSelect={onSelect} />
+          <RunRow
+            key={run.interviewId}
+            run={run}
+            isActive={run.interviewId === activeId}
+            onSelect={onSelect}
+          />
         ))}
       </ScrollArea>
       {isLoading && (

@@ -45,3 +45,36 @@
   text-overflow: ellipsis;
   white-space: nowrap;
 }
+
+/* The hover card's whole surface is the copy target; the button carries the
+   padding so rollover and click work edge to edge. */
+.dropdown {
+  padding: 0;
+  overflow: hidden;
+}
+
+.copyButton {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--mantine-spacing-sm);
+  width: 100%;
+  padding: var(--mantine-spacing-xs) var(--mantine-spacing-sm);
+  border-radius: var(--mantine-radius-sm);
+}
+
+.copyButton:hover {
+  background: var(--mantine-color-gray-1);
+}
+
+.copyIcon {
+  display: inline-flex;
+  flex: none;
+  color: var(--mantine-color-dimmed);
+  opacity: 0;
+  transition: opacity 100ms ease;
+}
+
+.copyButton:hover .copyIcon {
+  opacity: 1;
+}
